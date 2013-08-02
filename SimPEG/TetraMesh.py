@@ -1,7 +1,10 @@
 import numpy as np
 from BaseMesh import BaseMesh
 from utils import ndgrid, mkvc
-from sputils import sdiag,speye,appendBottom,appendBottom3
+from sputils import sdiag,speye,appendBottom,appendBottom3, appendRight, appendRight3,spzeros
+from TensorMesh import TensorMesh
+import matplotlib.pyplot as plt
+import matplotlib
 class TetraMesh(BaseMesh):
     """
     TetraMesh is a mesh class that deals with structured triangular/tetrahedral elements
@@ -32,16 +35,18 @@ class TetraMesh(BaseMesh):
         # Ensure h contains 1D vectors
         self._h = [mkvc(x) for x in h]
 
-
-
+    def __str__(self):
+        outStr = '  ---- {0:d}-D TetraMesh ----  '.format(self.dim)
+        return outStr
     def nodes():
         doc = "node list as a numpy array "
         def fget(self):
             if self._nodes is None:
+                Mesh = TensorMesh(self.h,self.x0)
                 if self.dim==2:
-                    self._nodes = np.vstack((self.gridN,self.gridCC))
+                    self._nodes = np.vstack((Mesh.gridN,Mesh.gridCC))
                 elif self.dim==3:
-                    self._nodes = np.vstack((self.gridN,self.gridFx,self.gridFy,self.gridFz,self.gridCC))
+                    self._nodes = np.vstack((Mesh.gridN,Mesh.gridFx,Mesh.gridFy,Mesh.gridFz,Mesh.gridCC))
             return self._nodes
         return locals()
     _nodes = None
@@ -129,11 +134,8 @@ class TetraMesh(BaseMesh):
         return locals()
     nTetra = property(**nTetra())
 
-
-
-
     def h():
-        doc = "h is a list containing the cell widths of the tensor mesh in each dimension."
+        doc = "h is a list containing the cell widths of the underlying tensor mesh in each dimension."
         fget = lambda self: self._h
         return locals()
     h = property(**h())
@@ -156,100 +158,22 @@ class TetraMesh(BaseMesh):
         return locals()
     hz = property(**hz())
 
-    def vectorNx():
-        doc = "Nodal grid vector (1D) in the x direction."
-        fget = lambda self: np.r_[0., self.hx.cumsum()] + self.x0[0]
-        return locals()
-    vectorNx = property(**vectorNx())
 
-    def vectorNy():
-        doc = "Nodal grid vector (1D) in the y direction."
-        fget = lambda self: None if self.dim < 2 else np.r_[0., self.hy.cumsum()] + self.x0[1]
-        return locals()
-    vectorNy = property(**vectorNy())
-
-    def vectorNz():
-        doc = "Nodal grid vector (1D) in the z direction."
-        fget = lambda self: None if self.dim < 3 else np.r_[0., self.hz.cumsum()] + self.x0[2]
-        return locals()
-    vectorNz = property(**vectorNz())
-
-    def vectorCCx():
-        doc = "Cell-centered grid vector (1D) in the x direction."
-        fget = lambda self: np.r_[0, self.hx[:-1].cumsum()] + self.hx*0.5 + self.x0[0]
-        return locals()
-    vectorCCx = property(**vectorCCx())
-
-    def vectorCCy():
-        doc = "Cell-centered grid vector (1D) in the y direction."
-        fget = lambda self: None if self.dim < 2 else np.r_[0, self.hy[:-1].cumsum()] + self.hy*0.5 + self.x0[1]
-        return locals()
-    vectorCCy = property(**vectorCCy())
-
-    def vectorCCz():
-        doc = "Cell-centered grid vector (1D) in the z direction."
-        fget = lambda self: None if self.dim < 3 else np.r_[0, self.hz[:-1].cumsum()] + self.hz*0.5 + self.x0[2]
-        return locals()
-    vectorCCz = property(**vectorCCz())
-
-    def gridCC():
-        doc = "Cell-centered grid."
-
+    def boundaryIndices():
+        doc = "indices of nodes lying on the boundary"
         def fget(self):
-            if self._gridCC is None:
-                self._gridCC = ndgrid([x for x in [self.vectorCCx, self.vectorCCy, self.vectorCCz] if not x is None])
-            return self._gridCC
+            if self._boundaryIndices is None:
+                idx = np.arange(np.prod(self.n+1)).reshape(self.n+1,order='F')
+                if self.dim==2:
+                    idx = np.r_[idx[[0,-1],:].flatten(),idx[:,[0,-1]].flatten()]
+                elif self.dim==3:
+                    idx = np.r_[idx[[0,-1],:,:].flatten(),idx[:,[0,-1],:].flatten(),idx[:,:,[0,-1]].flatten()]
+
+                self._boundaryIndices = np.unique(idx)
+            return self._boundaryIndices
         return locals()
-    _gridCC = None  # Store grid by default
-    gridCC = property(**gridCC())
-
-    def gridN():
-        doc = "Nodal grid."
-
-        def fget(self):
-            if self._gridN is None:
-                self._gridN = ndgrid([x for x in [self.vectorNx, self.vectorNy, self.vectorNz] if not x is None])
-            return self._gridN
-        return locals()
-    _gridN = None  # Store grid by default
-    gridN = property(**gridN())
-
-
-    def gridFx():
-        doc = "Face staggered grid in the x direction."
-
-        def fget(self):
-            if self._gridFx is None:
-                self._gridFx = ndgrid([x for x in [self.vectorNx, self.vectorCCy, self.vectorCCz] if not x is None])
-            return self._gridFx
-        return locals()
-    _gridFx = None  # Store grid by default
-    gridFx = property(**gridFx())
-
-    def gridFy():
-        doc = "Face staggered grid in the y direction."
-
-        def fget(self):
-            if self._gridFy is None:
-                self._gridFy = ndgrid([x for x in [self.vectorCCx, self.vectorNy, self.vectorCCz] if not x is None])
-            return self._gridFy
-        return locals()
-    _gridFy = None  # Store grid by default
-    gridFy = property(**gridFy())
-
-    def gridFz():
-        doc = "Face staggered grid in the z direction."
-
-        def fget(self):
-            if self._gridFz is None:
-                self._gridFz = ndgrid([x for x in [self.vectorCCx, self.vectorCCy, self.vectorNz] if not x is None])
-            return self._gridFz
-        return locals()
-    _gridFz = None  # Store grid by default
-    gridFz = property(**gridFz())
-    def getBoundaryIndex(self, gridType):
-        """Needed for faces edges and cells"""
-        pass
+    _boundaryIndices = None  # Store grid by default
+    boundaryIndices = property(**boundaryIndices())
 
     def getCellNumbering(self):
         pass
@@ -307,6 +231,45 @@ class TetraMesh(BaseMesh):
     _P4 = None  # Store grid by default
     P4 = property(**P4())
 
+    def PE1():
+        doc = "Projector on first edge of tetrahedra."
+        def fget(self):
+            if self._PE1 is None:
+                if self.dim==2:
+                    P = self.P1-self.P3
+                else:
+                    P = self.P1-self.P4
+                self._PE1 = P
+            return self._PE1
+        return locals()
+    _PE1 = None  # Store grid by default
+    PE1 = property(**PE1())
+
+    def PE2():
+        doc = "Projector on second edge of tetrahedra."
+        def fget(self):
+            if self._PE2 is None:
+                if self.dim==2:
+                    P = self.P2-self.P3
+                else:
+                    P = self.P2-self.P4
+                self._PE2 = P
+            return self._PE2
+        return locals()
+    _PE2 = None  # Store grid by default
+    PE2 = property(**PE2())
+
+    def PE3():
+        doc = "Projector on third edge of tetrahedra."
+        def fget(self):
+            if self._PE3 is None:
+                if self.dim==3:
+                    self._PE3 = self.P3-self.P4
+            return self._PE3
+        return locals()
+    _PE3 = None  # Store grid by default
+    PE3 = property(**PE3())
+
     def PC():
         doc = "Projector on barycenter of tetrahedra."
         def fget(self):
@@ -320,14 +283,25 @@ class TetraMesh(BaseMesh):
     _PC = None  # Store grid by default
     PC = property(**PC())
 
+    def PB():
+        doc = "Projector on boundary nodes."
+        def fget(self):
+            if self._PB is None:
+                P = speye(self.nNodes)
+                self._PB = P[self.boundaryIndices,:]
+            return self._PB
+        return locals()
+    _PB = None  # Store grid by default
+    PB = property(**PB())
+
     # --------------- Differential Operators --------
     def Dx():
         doc = "Derivative in x-direction"
         def fget(self):
             if self._Dx is None:
                 if self.dim==2:
-                    e1 =  self.P1*self.nodes - self.P3*self.nodes
-                    e2 =  self.P2*self.nodes - self.P3*self.nodes
+                    e1 =  self.PE1*self.nodes
+                    e2 =  self.PE2*self.nodes
 
                     # compute gradients of basis functions
                     dphi1 =  e2[:,1]/(2*self.vol)
@@ -340,9 +314,9 @@ class TetraMesh(BaseMesh):
                 elif self.dim==3:
 
                     # compute edges
-                    e1   =  self.P1*self.nodes - self.P4*self.nodes
-                    e2   =  self.P2*self.nodes - self.P4*self.nodes
-                    e3   =  self.P3*self.nodes - self.P4*self.nodes
+                    e1   =  self.PE1*self.nodes
+                    e2   =  self.PE2*self.nodes
+                    e3   =  self.PE3*self.nodes
                     # compute inverse transformation to reference element
                     cofA =  np.c_[ e2[:,1]*e3[:,2]-e2[:,2]*e3[:,1],-(e1[:,1]*e3[:,2]-e1[:,2]*e3[:,1]),e1[:,1]*e2[:,2]-e1[:,2]*e2[:,1]]
 
@@ -366,8 +340,8 @@ class TetraMesh(BaseMesh):
         def fget(self):
             if self._Dy is None:
                 if self.dim==2:
-                    e1 =  self.P1*self.nodes - self.P3*self.nodes
-                    e2 =  self.P2*self.nodes - self.P3*self.nodes
+                    e1 =  self.PE1*self.nodes
+                    e2 =  self.PE2*self.nodes
 
                     # compute gradients of basis functions
                     dphi1 =  -e2[:,0]/(2*self.vol)
@@ -379,9 +353,9 @@ class TetraMesh(BaseMesh):
 
                 elif self.dim==3:
                      # compute edges
-                    e1   =  self.P1*self.nodes - self.P4*self.nodes
-                    e2   =  self.P2*self.nodes - self.P4*self.nodes
-                    e3   =  self.P3*self.nodes - self.P4*self.nodes
+                    e1   =  self.PE1*self.nodes
+                    e2   =  self.PE2*self.nodes
+                    e3   =  self.PE3*self.nodes
                     # compute inverse transformation to reference element
                     cofA = np.c_[-(e2[:,0]*e3[:,2]-e2[:,2]*e3[:,0]),e1[:,0]*e3[:,2]-e1[:,2]*e3[:,0],-(e1[:,0]*e2[:,2]-e1[:,2]*e2[:,0])]
 
@@ -407,9 +381,9 @@ class TetraMesh(BaseMesh):
             if self._Dz is None:
                 if self.dim==3:
                      # compute edges
-                    e1   =  self.P1*self.nodes - self.P4*self.nodes
-                    e2   =  self.P2*self.nodes - self.P4*self.nodes
-                    e3   =  self.P3*self.nodes - self.P4*self.nodes
+                    e1   =  self.PE1*self.nodes
+                    e2   =  self.PE2*self.nodes
+                    e3   =  self.PE3*self.nodes
                     # compute inverse transformation to reference element
                     cofA = np.c_[e2[:,0]*e3[:,1]-e2[:,1]*e3[:,0], -(e1[:,0]*e3[:,1]-e1[:,1]*e3[:,0]), e1[:,0]*e2[:,1]-e1[:,1]*e2[:,0] ]
 
@@ -446,40 +420,239 @@ class TetraMesh(BaseMesh):
     # --------------- Geometries ---------------------
     def vol():
         doc = "tetrahedra volumes as 1d array."
-
         def fget(self):
             if(self._vol is None):
-                if(self.dim == 2):
-                    x1 = self.P1*self.nodes
-                    x2 = self.P2*self.nodes
-                    x3 = self.P3*self.nodes
-
-                    self._vol = ((x1[:,0]-x3[:,0])*(x2[:,1]-x3[:,1])-(x2[:,0]-x3[:,0])*(x1[:,1]-x3[:,1]))/2.;
-                elif(self.dim == 3):
-                    x1 = self.P1*self.nodes
-                    x2 = self.P2*self.nodes
-                    x3 = self.P3*self.nodes
-                    x4 = self.P4*self.nodes
-
-                    e1 = x1-x4
-                    e2 = x2-x4
-                    e3 = x3-x4
-
-                    self._vol = (1./6)* (e1[:,0]*e2[:,1]*e3[:,2] + e2[:,0]*e3[:,1]*e1[:,2] + e3[:,0]*e1[:,1]*e2[:,2] - e1[:,2]*e2[:,1]*e3[:,0] - e2[:,2]*e3[:,1]*e1[:,0] - e3[:,2]*e1[:,1]*e2[:,0])
-
+                self._vol = self.getVolume(self.nodes,False)
             return self._vol
         return locals()
     _vol = None
     vol = property(**vol())
 
+    # ---------------  Volume and Determinant ---------------------
+    def getVolume(self,yc,doDerivative=True):
+        assert type(doDerivative) == bool, "doDerivative must be a boolean."
+        assert type(yc) == np.ndarray, "yc must be a numpy array."
+        assert yc.size == self.nodes.size, "yc is of incorrect size."
+
+        yc = yc.reshape(-1,self.dim)
+
+        if self.dim == 2:
+            PE1 = self.PE1
+            PE2 = self.PE2
+
+            e1 = PE1*yc
+            e2 = PE2*yc
+
+            V  = (e1[:,0]*e2[:,1] - e1[:,1]*e2[:,0])/2.0
+
+            if doDerivative:
+                dV =   appendRight( sdiag(e2[:,1])*PE1 - sdiag(e1[:,1])*PE2 , sdiag(e1[:,1])*PE2 - sdiag(e2[:,0])*PE1)/2.0
+                return V,dV
+            else:
+                return V
+        elif self.dim == 3:
+            PE1 = self.PE1
+            PE2 = self.PE2
+            PE3 = self.PE3
+
+            e1 = PE1*yc
+            e2 = PE2*yc
+            e3 = PE3*yc
+
+            cof11 =    e2[:,1]*e3[:,2] - e2[:,2]*e3[:,1]
+            cof21 =  -(e2[:,0]*e3[:,2] - e2[:,2]*e3[:,0])
+            cof31 =    e2[:,0]*e3[:,1] - e2[:,1]*e3[:,0]
+
+            V     = (e1[:,0]*cof11 + e1[:,1]*cof21 + e1[:,2]*cof31)/6.0
+
+            if doDerivative:
+                Z = spzeros(self.nTetra,self.nNodes)
+                # derivatives of cofactors
+                dcof11 =   appendRight3(Z,  sdiag(e3[:,2])*PE2 - sdiag(e2[:,2])*PE3, sdiag(e2[:,1])*PE3 - sdiag(e3[:,1])*PE2)
+                dcof21 = - appendRight3(sdiag(e3[:,2])*PE2 - sdiag(e2[:,2])*PE3,  Z, sdiag(e2[:,0])*PE3 - sdiag(e3[:,0])*PE2)
+                dcof31 =   appendRight3(sdiag(e3[:,1])*PE2 - sdiag(e2[:,1])*PE3, sdiag(e2[:,0])*PE3 - sdiag(e3[:,0])*PE2,Z)
+
+                # apply product rule
+                dV  = (1/6.0)*(appendRight3(sdiag(cof11)*PE1, sdiag(cof21)*self.PE1, sdiag(cof31)*self.PE1) + sdiag(e1[:,0]) * dcof11 + sdiag(e1[:,1]) * dcof21 + sdiag(e1[:,2]) * dcof31)
+
+                return V,dV
+            else:
+                return V
+
+    def getCofactor(self,yc,doDerivative=True):
+        assert type(doDerivative) == bool, "doDerivative must be a boolean."
+        assert type(yc) == np.ndarray, "yc must be a numpy array."
+        assert yc.size  == self.nodes.size, "yc is of incorrect size."
+        assert self.dim == 3, "cofactor exists only for 3D displacements."
+
+        yc = yc.reshape(-1,self.dim)
+
+        Dx = self.Dx
+        Dy = self.Dy
+        Dz = self.Dz
+
+        e1 = Dx*yc
+        e2 = Dy*yc
+        e3 = Dz*yc
+
+        cof11 =    e2[:,1]*e3[:,2] - e2[:,2]*e3[:,1]
+        cof21 =  -(e2[:,0]*e3[:,2] - e2[:,2]*e3[:,0])
+        cof31 =    e2[:,0]*e3[:,1] - e2[:,1]*e3[:,0]
+
+        cof12 =  -(e1[:,1]*e3[:,2] - e1[:,2]*e3[:,1])
+        cof22 =    e1[:,0]*e3[:,2] - e1[:,2]*e3[:,0]
+        cof32 =  -(e1[:,0]*e3[:,1] - e1[:,1]*e3[:,0])
+
+        cof13 =    e1[:,1]*e2[:,2] - e1[:,2]*e2[:,1]
+        cof23 =  -(e1[:,0]*e2[:,2] - e1[:,2]*e2[:,0])
+        cof33 =    e1[:,0]*e2[:,1] - e1[:,1]*e2[:,0]
+
+        cof   = np.c_[cof11,cof21,cof31,cof12,cof22,cof32,cof13,cof23,cof33]
+
+        if doDerivative:
+            Z = spzeros(self.nTetra,self.nNodes)
+            # derivatives of cofactors
+            dcof11 =   appendRight3(Z,  sdiag(e3[:,2])*Dy - sdiag(e2[:,2])*Dz, sdiag(e2[:,1])*Dz - sdiag(e3[:,1])*Dy)
+            dcof21 = - appendRight3(sdiag(e3[:,2])*Dy - sdiag(e2[:,2])*Dz,  Z, sdiag(e2[:,0])*Dz - sdiag(e3[:,0])*Dy)
+            dcof31 =   appendRight3(sdiag(e3[:,1])*Dy - sdiag(e2[:,1])*Dz, sdiag(e2[:,0])*Dz - sdiag(e3[:,0])*Dy,Z)
+
+            dcof12 = - appendRight3(Z,  sdiag(e3[:,2])*Dx - sdiag(e1[:,2])*Dz, sdiag(e1[:,1])*Dz - sdiag(e1[:,1])*Dx)
+            dcof22 =   appendRight3(sdiag(e3[:,2])*Dx - sdiag(e1[:,2])*Dz,  Z, sdiag(e1[:,0])*Dz - sdiag(e3[:,0])*Dx)
+            dcof32 = - appendRight3(sdiag(e3[:,1])*Dx - sdiag(e1[:,1])*Dz, sdiag(e1[:,0])*Dz - sdiag(e3[:,0])*Dx,Z)
+
+            dcof13 =   appendRight3(Z,  sdiag(e2[:,2])*Dx - sdiag(e1[:,2])*Dy, sdiag(e2[:,1])*Dx - sdiag(e2[:,1])*Dx)
+            dcof23 = - appendRight3(sdiag(e2[:,2])*Dx - sdiag(e1[:,2])*Dy,  Z, sdiag(e1[:,0])*Dy - sdiag(e2[:,0])*Dx)
+            dcof33 =   appendRight3(sdiag(e2[:,1])*Dx - sdiag(e1[:,1])*Dy, sdiag(e1[:,0])*Dy - sdiag(e2[:,0])*Dx,Z)
+          # apply product rule
+            dcof  = [dcof11,dcof21,dcof31,dcof12,dcof22,dcof32,dcof13,dcof23,dcof33]
+
+            return cof,dcof
+        else:
+            return cof
 
 
 
-    def area():
-        pass
 
-    def edge():
-        pass
+    def getDeterminant(self, yc, doDerivative=True):
+        assert type(doDerivative) == bool, "doDerivative must be a boolean."
+        assert type(yc) == np.ndarray, "yc must be a numpy array."
+        assert yc.size == self.nodes.size, "yc is of incorrect size."
+
+        yc = yc.reshape(-1,self.dim)
+
+        if self.dim == 2:
+            Dx = self.Dx
+            Dy = self.Dy
+
+            e1 = Dx*yc
+            e2 = Dy*yc
+
+            V  = (e1[:,0]*e2[:,1] - e1[:,1]*e2[:,0])
+
+            if doDerivative:
+                dV =   appendRight( sdiag(e2[:,1])*Dx - sdiag(e1[:,1])*Dy , sdiag(e1[:,1])*Dy - sdiag(e2[:,0])*Dx)
+                return V,dV
+            else:
+                return V
+        elif self.dim == 3:
+            Dx = self.Dx
+            Dy = self.Dy
+            Dz = self.Dz
+
+            e1 = Dx*yc
+            e2 = Dy*yc
+            e3 = Dz*yc
+
+            cof11 =    e2[:,1]*e3[:,2] - e2[:,2]*e3[:,1]
+            cof21 =  -(e2[:,0]*e3[:,2] - e2[:,2]*e3[:,0])
+            cof31 =    e2[:,0]*e3[:,1] - e2[:,1]*e3[:,0]
+
+            V     = (e1[:,0]*cof11 + e1[:,1]*cof21 + e1[:,2]*cof31)
+
+            if doDerivative:
+                Z = spzeros(self.nTetra,self.nNodes)
+                # derivatives of cofactors
+                dcof11 =   appendRight3(Z,  sdiag(e3[:,2])*Dy - sdiag(e2[:,2])*Dz, sdiag(e2[:,1])*Dz - sdiag(e3[:,1])*Dy)
+                dcof21 = - appendRight3(sdiag(e3[:,2])*Dy - sdiag(e2[:,2])*Dz,  Z, sdiag(e2[:,0])*Dz - sdiag(e3[:,0])*Dy)
+                dcof31 =   appendRight3(sdiag(e3[:,1])*Dy - sdiag(e2[:,1])*Dz, sdiag(e2[:,0])*Dz - sdiag(e3[:,0])*Dy,Z)
+
+                # apply product rule
+                dV  = appendRight3(sdiag(cof11)*Dx, sdiag(cof21)*self.Dx, sdiag(cof31)*self.Dx) + sdiag(e1[:,0]) * dcof11 + sdiag(e1[:,1]) * dcof21 + sdiag(e1[:,2]) * dcof31
+
+                return V,dV
+            else:
+                return V
+
+    # ---------------  Plotting ---------------------
+    def plotMesh(self,yc=None,ax=None):
+        """
+            plotMesh(self,yc=None,ax=None):
+
+            Plots tetrahedral mesh (currently only 2D supported). Provide shifted nodes when visualizing a deformation.
+            If yc is None the Mesh nodes are used.
+        """
+
+        if yc is None:
+            yc = self.nodes
+        else:
+            assert type(yc) == np.ndarray, "yc must be a numpy array."
+            assert yc.size == self.nodes.size, "yc is of ncorrect size."
+            yc = yc.reshape(-1,self.dim)
+
+        assert self.dim == 2, "dimension must be 2."
+        if ax is None:
+            fig = plt.figure(1)
+            fig.clf()
+            ax = plt.subplot(111)
+        else:
+            assert isinstance(ax,matplotlib.axes.Axes), "ax must be an Axes!"
+            fig = ax.figure
+
+        if self.dim == 2:
+            ax.set_aspect('equal')
+            ax.triplot(yc[:,0], yc[:,1], self.tetra, 'bo-')
+            ax.set_xlabel('y')
+            ax.set_ylabel('x')
+
+    def plotImage(self,C,yc=None,ax=None):
+        """
+            plotImage(self,C,yc=None,ax=None):
+
+            Visualizes image C on a possibly deformed tetrahedral mesh given by the nodes yc.
+            If yc is None, the nodes of the Mesh are used.
+
+            Colordata can be given either on the nodes or on the tetrahedra.
+
+            see also matplotlib.tripcolor
+        """
+
+        assert type(C) == np.ndarray, "C must be a numpy array."
+        assert C.size in [self.nNodes, self.nTetra]  , "C must be given either on the nodes or on the tetrahedra."
+
+        if yc is None:
+            yc = self.nodes
+        else:
+            assert type(yc) == np.ndarray, "yc must be a numpy array."
+            assert yc.size == self.nodes.size, "yc is of ncorrect size."
+            yc = yc.reshape(-1,self.dim)
+
+        assert self.dim == 2, "dimension must be 2."
+        if ax is None:
+            fig = plt.figure(1)
+            fig.clf()
+            ax = plt.subplot(111)
+        else:
+            assert isinstance(ax,matplotlib.axes.Axes), "ax must be an Axes!"
+            fig = ax.figure
+
+        if self.dim == 2:
+            ax.set_aspect('equal')
+            ax.tripcolor(yc[:,0], yc[:,1], self.tetra, C,edgecolors='b')
+            ax.set_xlabel('y')
+            ax.set_ylabel('x')
+
+
+
 
 
 if __name__ == '__main__':
