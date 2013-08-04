@@ -25,7 +25,6 @@ def interpmat(x,y,z,xr,yr,zr):
     dx, dy, dz = np.zeros(2), np.zeros(2), np.zeros(2)
     for i in range(0, nps): 
         im = np.argmin(abs(xr[i]-x))
-        print i,im
         if  xr[i] - x[im] >= 0:  # Point on the left 
                  ind_x[0] = im;   ind_x[1] = im+1
         else:                    # Point on the right
@@ -71,9 +70,6 @@ def interpmat(x,y,z,xr,yr,zr):
         v[ ind_x[1],  ind_y[1],  ind_z[1]] = (1-dx[1]/Dx)*(1-dy[1]/Dy)*(1-dz[1]/Dz)
 
      
-        print(np.shape(v.flatten('F')))
-        print(np.shape(Q))
-        
         Q[i,:] = v.flatten('F')
         
      

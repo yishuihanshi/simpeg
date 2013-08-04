@@ -1,13 +1,18 @@
 import numpy as np
 from utils import mkvc
+from sputils import sdiag
 import scipy.sparse.linalg.dsolve as dsl
 from InnerProducts import getFaceInnerProduct, getEdgeInnerProduct
 
 def getMisfit(m,mesh,forward,param):
 
-    mu0   = 4*np.pi*1e-7
-    omega = forward['omega'] #[param['indomega']]
-    rhs   = forward['rhs']   #[:,param['indrhs']]
+    mu0    = 4*np.pi*1e-7
+    omega  = forward['omega'] #[param['indomega']]
+    rhs    = forward['rhs']   #[:,param['indrhs']]
+    dobs   = param['dobs']   #[:,param['indrhs']]
+    Act    = param['Act']
+    sigma0 = 1e-8
+
     mis   = 0
     dmis  = m*0
 
@@ -16,25 +21,33 @@ def getMisfit(m,mesh,forward,param):
         for j in range(rhs.shape[1]):
             Curl  = mesh.edgeCurl
             #Grad  = mesh.nodalGrad
-            sigma = np.exp(m)
+            sigma = Act.T.dot(np.exp(m)) + sigma0
             Me,PP = getEdgeInnerProduct(mesh,sigma)
-            Mf    = 1/mu0 * getFaceInnerProduct(mesh)   # assume mu = mu0
-
-            A = Curl.T * Mf * Curl - 1j * omega[i] * Me
-            b = mkvc(np.array(rhs[:,j]))
+            Mf,QQ = getFaceInnerProduct(mesh,1/mu0*np.ones(mesh.nC))   # assume mu = mu0
+            A = Curl.T.dot(Mf.dot(Curl)) - 1j * omega[i] * Me
+            b = -1j*omega[i]*mkvc(np.array(rhs[:,j]),1)
             e = dsl.spsolve(A,b)
-            e = mkvc(e,2)
-            #print np.linalg.norm(A*e-b)/np.linalg.norm(b)
+            e = mkvc(e,1)
+            print np.linalg.norm(A*e-b)/np.linalg.norm(b)
             P = forward['projection']
-            d = P*e
-            r = mkvc(d - param.dobs[i,j,:],2)
+            d = P.dot(e)
+            
+            r = mkvc(d,1) - mkvc(dobs[j,:,i],1)
 
-            mis  = mis + 0.5*(r.T*r)
+            mis  = mis + 0.5*np.real(r.conj().T.dot(r))
+
             # get derivatives
-            lam  = dsl.spsolve(A.T,P.T*r)
-            lam  = mkvc(lam,2)
-            Gij  =  - 1j * omega[i] * PP.T*sp.diag((PP*e)*mesh.vol) 
-            dmis = dmis - Gij.T*lam
+            lam  = dsl.spsolve(A.T,P.T.dot(r))
+            lam  = mkvc(lam,1)
+            Gij  = 0
+            I3   = sp.vstack((sp.eye(mesh.nC),sp.eye(mesh.nC),sp.eye(mesh.nC)))
+            for jj in range(0,8):
+                Gij  =  Gij - 1j * omega[i] * (PP[jj].T.dot(sdiag(PP[jj].dot(e)))).dot(I3) 
+             
+            # keep some of the G's for stochastic gradient
+            # if ij == ...
+            #   G = vstack((G,Gij))  
+            dmis = dmis + np.real(sdiag(np.exp(m)).dot(Act.dot(Gij.conj().T.dot(lam))))
 
 
     return mis, dmis, d
@@ -44,13 +57,17 @@ def getMisfit(m,mesh,forward,param):
 if __name__ == '__main__':
     from TensorMesh import TensorMesh 
     from interpmat import interpmat
+
     from scipy import sparse as sp
 
-    h = [np.ones(7),np.ones(8),np.ones(9)]
-    mesh = TensorMesh(h)
-    xs = np.array([3.1,4.3,5.4,6.5])
-    ys = np.array([3.2,4.1,5.4,6.2])
-    zs = np.array([4.3,4.2,4.1,4.1]);
+    # generate the mesh
+    h = [50*np.ones(8),50*np.ones(8),50*np.ones(8)]
+    mesh = TensorMesh(h,[-200.0,-200.0,-200.0])
+
+    # generate the interpolation matrix
+    xs = np.array([-40.1,-43.2,54.6,65.8])
+    ys = np.array([-32.1,-41.3,54.2,62.1])
+    zs = np.array([0.0,0.0,0.0,0.0]);
 
     xyz = mesh.gridEx
     x   = xyz[:,0]; y = xyz[:,1]; z = xyz[:,2]
@@ -64,16 +81,38 @@ if __name__ == '__main__':
     x   = xyz[:,0]; y = xyz[:,1]; z = xyz[:,2]
     x   = list(set(x)); y = list(set(y)); z = list(set(z))
     Pz  = interpmat(x,y,z,xs,ys,zs)
-    P   = sp.hstack((Px,Py,Pz))
+    P   = sp.block_diag((Px,Py,0*Pz))
 
+    # generate sources (waiting to integrate this with Chris's sources)
+    numsrc  = 3
     ne      = np.sum(mesh.nE)
-    Q       = np.matrix(np.random.randn(ne,5))
-    omega   = [1,2,3]
+    Q       = np.matrix(np.random.randn(ne,numsrc))
+
+    omega   = [10,100]
     forward = {'omega':omega, 'rhs':Q,'projection':P}
-    dobs    = np.ones([np.size(xs),5,np.size(omega)])
-    param   = {'dobs':dobs}
+    dobs    = np.ones([numsrc,3*np.size(xs),np.size(omega)])
+    
+
+    # generate matrix for active cells
+    xyz    = mesh.gridCC
+    x      = xyz[:,0]; y = xyz[:,1]; z = xyz[:,2]
+    a      = z*0
+    a[z<0] = 1
+    nact   = sum(a)
+    I      = np.nonzero(a>0)[0]
+    Act    = sp.coo_matrix((I*0+1.0,(I,I)),shape=(nact,mesh.nC))
+
+    param   = {'dobs':dobs,'Act':Act}
+
+    # setup the model
+    m = np.log(1e-3*np.ones(nact))
+    # solve maxwell and get derivatives
+    mis, dmis, d = getMisfit(m,mesh,forward,param)
+
+    # check derivatives
+    dm = 1e-5*np.random.randn(nact)
+    mis1, dmis1, d1 = getMisfit(m+dm,mesh,forward,param)
+
+    print mis1-mis,  mis1-mis - dm.dot(dmis)
 
 
-
-    m = np.ones(mesh.nC)
-    getMisfit(m,mesh,forward,param)
