@@ -27,18 +27,22 @@ def getMisfit(m,mesh,forward,param):
             A = Curl.T.dot(Mf.dot(Curl)) - 1j * omega[i] * Me
             b = -1j*omega[i]*mkvc(np.array(rhs[:,j]),1)
             e = dsl.spsolve(A,b)
-            e = mkvc(e,1)
+            e = mkvc(e)
             print np.linalg.norm(A*e-b)/np.linalg.norm(b)
             P = forward['projection']
             d = P.dot(e)
             
-            r = mkvc(d,1) - mkvc(dobs[j,:,i],1)
+            # change to r[j,:,i] = mkvc(d) - mkvc(dobs[j,:,i])
+            # and after computing
+            # rw = hadamard(W[j,:,i],r)
+            # not to forget to multiply again with W for the gradient 
+            r = mkvc(d) - mkvc(dobs[j,:,i])
 
             mis  = mis + 0.5*np.real(r.conj().T.dot(r))
 
             # get derivatives
             lam  = dsl.spsolve(A.T,P.T.dot(r))
-            lam  = mkvc(lam,1)
+            lam  = mkvc(lam)
             Gij  = 0
             I3   = sp.vstack((sp.eye(mesh.nC),sp.eye(mesh.nC),sp.eye(mesh.nC)))
             for jj in range(0,8):
@@ -61,7 +65,7 @@ if __name__ == '__main__':
     from scipy import sparse as sp
 
     # generate the mesh
-    h = [50*np.ones(8),50*np.ones(8),50*np.ones(8)]
+    h = [25*np.ones(16),25*np.ones(16),25*np.ones(16)]
     mesh = TensorMesh(h,[-200.0,-200.0,-200.0])
 
     # generate the interpolation matrix
@@ -110,7 +114,7 @@ if __name__ == '__main__':
     mis, dmis, d = getMisfit(m,mesh,forward,param)
 
     # check derivatives
-    dm = 1e-5*np.random.randn(nact)
+    dm = 1e-1*np.random.randn(nact)
     mis1, dmis1, d1 = getMisfit(m+dm,mesh,forward,param)
 
     print mis1-mis,  mis1-mis - dm.dot(dmis)
