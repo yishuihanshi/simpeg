@@ -1,7 +1,8 @@
 import numpy as np
 from BaseMesh import BaseMesh
 from utils import ndgrid, mkvc
-from sputils import sdiag,speye,appendBottom,appendBottom3, appendRight, appendRight3,spzeros
+from sputils import sdiag,speye,spzeros
+from scipy import sparse as sp
 from TensorMesh import TensorMesh
 import matplotlib.pyplot as plt
 import matplotlib
@@ -408,10 +409,9 @@ class TetraMesh(BaseMesh):
         def fget(self):
             if self._GRAD is None:
                 if self.dim==2:
-                    self._GRAD = appendBottom(self.Dx,self.Dy)
+                    self._GRAD = sp.vstack((self.Dx,self.Dy))
                 elif self.dim==3:
-                    self._GRAD = appendBottom3(self.Dx,self.Dy,self.Dz)
-
+                    self._GRAD = sp.vstack((self.Dx,self.Dy,self.Dz))
             return self._GRAD
         return locals()
     _GRAD = None  # Store grid by default
@@ -434,7 +434,7 @@ class TetraMesh(BaseMesh):
         assert type(yc) == np.ndarray, "yc must be a numpy array."
         assert yc.size == self.nodes.size, "yc is of incorrect size."
 
-        yc = yc.reshape(-1,self.dim)
+        yc = yc.reshape(-1,self.dim,order='F')
 
         if self.dim == 2:
             PE1 = self.PE1
@@ -446,7 +446,7 @@ class TetraMesh(BaseMesh):
             V  = (e1[:,0]*e2[:,1] - e1[:,1]*e2[:,0])/2.0
 
             if doDerivative:
-                dV =   appendRight( sdiag(e2[:,1])*PE1 - sdiag(e1[:,1])*PE2 , sdiag(e1[:,1])*PE2 - sdiag(e2[:,0])*PE1)/2.0
+                dV =   sp.hstack(( sdiag(e2[:,1])*PE1 - sdiag(e1[:,1])*PE2 , sdiag(e1[:,1])*PE2 - sdiag(e2[:,0])*PE1))/2.0
                 return V,dV
             else:
                 return V
@@ -468,12 +468,12 @@ class TetraMesh(BaseMesh):
             if doDerivative:
                 Z = spzeros(self.nTetra,self.nNodes)
                 # derivatives of cofactors
-                dcof11 =   appendRight3(Z,  sdiag(e3[:,2])*PE2 - sdiag(e2[:,2])*PE3, sdiag(e2[:,1])*PE3 - sdiag(e3[:,1])*PE2)
-                dcof21 = - appendRight3(sdiag(e3[:,2])*PE2 - sdiag(e2[:,2])*PE3,  Z, sdiag(e2[:,0])*PE3 - sdiag(e3[:,0])*PE2)
-                dcof31 =   appendRight3(sdiag(e3[:,1])*PE2 - sdiag(e2[:,1])*PE3, sdiag(e2[:,0])*PE3 - sdiag(e3[:,0])*PE2,Z)
+                dcof11 =   sp.hstack((Z,  sdiag(e3[:,2])*PE2 - sdiag(e2[:,2])*PE3, sdiag(e2[:,1])*PE3 - sdiag(e3[:,1])*PE2))
+                dcof21 = - sp.hstack((sdiag(e3[:,2])*PE2 - sdiag(e2[:,2])*PE3,  Z, sdiag(e2[:,0])*PE3 - sdiag(e3[:,0])*PE2))
+                dcof31 =   sp.hstack((sdiag(e3[:,1])*PE2 - sdiag(e2[:,1])*PE3, sdiag(e2[:,0])*PE3 - sdiag(e3[:,0])*PE2,Z))
 
                 # apply product rule
-                dV  = (1/6.0)*(appendRight3(sdiag(cof11)*PE1, sdiag(cof21)*self.PE1, sdiag(cof31)*self.PE1) + sdiag(e1[:,0]) * dcof11 + sdiag(e1[:,1]) * dcof21 + sdiag(e1[:,2]) * dcof31)
+                dV  = (1/6.0)*(sp.hstack((sdiag(cof11)*PE1, sdiag(cof21)*self.PE1, sdiag(cof31)*self.PE1) + sdiag(e1[:,0]) * dcof11 + sdiag(e1[:,1]) * dcof21 + sdiag(e1[:,2]) * dcof31))
 
                 return V,dV
             else:
@@ -485,7 +485,7 @@ class TetraMesh(BaseMesh):
         assert yc.size  == self.nodes.size, "yc is of incorrect size."
         assert self.dim == 3, "cofactor exists only for 3D displacements."
 
-        yc = yc.reshape(-1,self.dim)
+        yc = yc.reshape(-1,self.dim,order='F')
 
         Dx = self.Dx
         Dy = self.Dy
@@ -512,17 +512,17 @@ class TetraMesh(BaseMesh):
         if doDerivative:
             Z = spzeros(self.nTetra,self.nNodes)
             # derivatives of cofactors
-            dcof11 =   appendRight3(Z,  sdiag(e3[:,2])*Dy - sdiag(e2[:,2])*Dz, sdiag(e2[:,1])*Dz - sdiag(e3[:,1])*Dy)
-            dcof21 = - appendRight3(sdiag(e3[:,2])*Dy - sdiag(e2[:,2])*Dz,  Z, sdiag(e2[:,0])*Dz - sdiag(e3[:,0])*Dy)
-            dcof31 =   appendRight3(sdiag(e3[:,1])*Dy - sdiag(e2[:,1])*Dz, sdiag(e2[:,0])*Dz - sdiag(e3[:,0])*Dy,Z)
+            dcof11 =   sp.hstack((Z,  sdiag(e3[:,2])*Dy - sdiag(e2[:,2])*Dz, sdiag(e2[:,1])*Dz - sdiag(e3[:,1])*Dy))
+            dcof21 = - sp.hstack((sdiag(e3[:,2])*Dy - sdiag(e2[:,2])*Dz,  Z, sdiag(e2[:,0])*Dz - sdiag(e3[:,0])*Dy))
+            dcof31 =   sp.hstack((sdiag(e3[:,1])*Dy - sdiag(e2[:,1])*Dz, sdiag(e2[:,0])*Dz - sdiag(e3[:,0])*Dy,Z))
 
-            dcof12 = - appendRight3(Z,  sdiag(e3[:,2])*Dx - sdiag(e1[:,2])*Dz, sdiag(e1[:,1])*Dz - sdiag(e1[:,1])*Dx)
-            dcof22 =   appendRight3(sdiag(e3[:,2])*Dx - sdiag(e1[:,2])*Dz,  Z, sdiag(e1[:,0])*Dz - sdiag(e3[:,0])*Dx)
-            dcof32 = - appendRight3(sdiag(e3[:,1])*Dx - sdiag(e1[:,1])*Dz, sdiag(e1[:,0])*Dz - sdiag(e3[:,0])*Dx,Z)
+            dcof12 = - sp.hstack((Z,  sdiag(e3[:,2])*Dx - sdiag(e1[:,2])*Dz, sdiag(e1[:,1])*Dz - sdiag(e1[:,1])*Dx))
+            dcof22 =   sp.hstack((sdiag(e3[:,2])*Dx - sdiag(e1[:,2])*Dz,  Z, sdiag(e1[:,0])*Dz - sdiag(e3[:,0])*Dx))
+            dcof32 = - sp.hstack((sdiag(e3[:,1])*Dx - sdiag(e1[:,1])*Dz, sdiag(e1[:,0])*Dz - sdiag(e3[:,0])*Dx,Z))
 
-            dcof13 =   appendRight3(Z,  sdiag(e2[:,2])*Dx - sdiag(e1[:,2])*Dy, sdiag(e2[:,1])*Dx - sdiag(e2[:,1])*Dx)
-            dcof23 = - appendRight3(sdiag(e2[:,2])*Dx - sdiag(e1[:,2])*Dy,  Z, sdiag(e1[:,0])*Dy - sdiag(e2[:,0])*Dx)
-            dcof33 =   appendRight3(sdiag(e2[:,1])*Dx - sdiag(e1[:,1])*Dy, sdiag(e1[:,0])*Dy - sdiag(e2[:,0])*Dx,Z)
+            dcof13 =   sp.hstack((Z,  sdiag(e2[:,2])*Dx - sdiag(e1[:,2])*Dy, sdiag(e2[:,1])*Dx - sdiag(e2[:,1])*Dx))
+            dcof23 = - sp.hstack((sdiag(e2[:,2])*Dx - sdiag(e1[:,2])*Dy,  Z, sdiag(e1[:,0])*Dy - sdiag(e2[:,0])*Dx))
+            dcof33 =   sp.hstack((sdiag(e2[:,1])*Dx - sdiag(e1[:,1])*Dy, sdiag(e1[:,0])*Dy - sdiag(e2[:,0])*Dx,Z))
           # apply product rule
             dcof  = [dcof11,dcof21,dcof31,dcof12,dcof22,dcof32,dcof13,dcof23,dcof33]
 
@@ -538,7 +538,7 @@ class TetraMesh(BaseMesh):
         assert type(yc) == np.ndarray, "yc must be a numpy array."
         assert yc.size == self.nodes.size, "yc is of incorrect size."
 
-        yc = yc.reshape(-1,self.dim)
+        yc = yc.reshape(-1,self.dim,order='F')
 
         if self.dim == 2:
             Dx = self.Dx
@@ -550,7 +550,7 @@ class TetraMesh(BaseMesh):
             V  = (e1[:,0]*e2[:,1] - e1[:,1]*e2[:,0])
 
             if doDerivative:
-                dV =   appendRight( sdiag(e2[:,1])*Dx - sdiag(e1[:,1])*Dy , sdiag(e1[:,1])*Dy - sdiag(e2[:,0])*Dx)
+                dV =   sp.hstack(( sdiag(e2[:,1])*Dx - sdiag(e1[:,1])*Dy , sdiag(e1[:,1])*Dy - sdiag(e2[:,0])*Dx))
                 return V,dV
             else:
                 return V
@@ -572,12 +572,12 @@ class TetraMesh(BaseMesh):
             if doDerivative:
                 Z = spzeros(self.nTetra,self.nNodes)
                 # derivatives of cofactors
-                dcof11 =   appendRight3(Z,  sdiag(e3[:,2])*Dy - sdiag(e2[:,2])*Dz, sdiag(e2[:,1])*Dz - sdiag(e3[:,1])*Dy)
-                dcof21 = - appendRight3(sdiag(e3[:,2])*Dy - sdiag(e2[:,2])*Dz,  Z, sdiag(e2[:,0])*Dz - sdiag(e3[:,0])*Dy)
-                dcof31 =   appendRight3(sdiag(e3[:,1])*Dy - sdiag(e2[:,1])*Dz, sdiag(e2[:,0])*Dz - sdiag(e3[:,0])*Dy,Z)
+                dcof11 =   sp.hstack((Z,  sdiag(e3[:,2])*Dy - sdiag(e2[:,2])*Dz, sdiag(e2[:,1])*Dz - sdiag(e3[:,1])*Dy))
+                dcof21 = - sp.hstack((sdiag(e3[:,2])*Dy - sdiag(e2[:,2])*Dz,  Z, sdiag(e2[:,0])*Dz - sdiag(e3[:,0])*Dy))
+                dcof31 =   sp.hstack((sdiag(e3[:,1])*Dy - sdiag(e2[:,1])*Dz, sdiag(e2[:,0])*Dz - sdiag(e3[:,0])*Dy,Z))
 
                 # apply product rule
-                dV  = appendRight3(sdiag(cof11)*Dx, sdiag(cof21)*self.Dx, sdiag(cof31)*self.Dx) + sdiag(e1[:,0]) * dcof11 + sdiag(e1[:,1]) * dcof21 + sdiag(e1[:,2]) * dcof31
+                dV  = sp.hstack(( sdiag(cof11)*Dx, sdiag(cof21)*self.Dx, sdiag(cof31)*self.Dx)) + sdiag(e1[:,0]) * dcof11 + sdiag(e1[:,1]) * dcof21 + sdiag(e1[:,2]) * dcof31
 
                 return V,dV
             else:
@@ -597,7 +597,7 @@ class TetraMesh(BaseMesh):
         else:
             assert type(yc) == np.ndarray, "yc must be a numpy array."
             assert yc.size == self.nodes.size, "yc is of ncorrect size."
-            yc = yc.reshape(-1,self.dim)
+            yc = yc.reshape(-1,self.dim,order='F')
 
         assert self.dim == 2, "dimension must be 2."
         if ax is None:
@@ -648,8 +648,8 @@ class TetraMesh(BaseMesh):
         if self.dim == 2:
             ax.set_aspect('equal')
             ax.tripcolor(yc[:,0], yc[:,1], self.tetra, C,edgecolors='b')
-            ax.set_xlabel('y')
-            ax.set_ylabel('x')
+            ax.set_xlabel('x')
+            ax.set_ylabel('y')
 
 
 
@@ -675,5 +675,8 @@ if __name__ == '__main__':
 
     I = np.linspace(0, 1, 8)
     M = TetraMesh(h, x0)
+
+
+    M.plotMesh
 
     print M.GRAD
