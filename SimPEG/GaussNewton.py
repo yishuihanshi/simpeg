@@ -1,6 +1,8 @@
 import numpy as np
 import matplotlib.pyplot as plt
-from pylab import norm
+from utils import mkvc, sdiag
+norm = np.linalg.norm
+
 
 def GaussNewton(fctn, x0,maxIter=20, maxIterLS=10, LSreduction=1e-4, tolJ=1e-3, tolX=1e-3,
                                                     tolG=1e-3, eps=1e-16, xStop=[]):
@@ -17,7 +19,7 @@ def GaussNewton(fctn, x0,maxIter=20, maxIterLS=10, LSreduction=1e-4, tolJ=1e-3, 
             xOpt - numerical optimizer
     """
     # initial output
-    print "%s GaussNewton %s" % ('='*22,'='*22)
+    print "%s GaussNewton %s" % ('='*22, '='*22)
     print "iter\tJc\t\tnorm(dJ)\tLS"
     print "%s" % '-'*57
 
@@ -33,7 +35,7 @@ def GaussNewton(fctn, x0,maxIter=20, maxIterLS=10, LSreduction=1e-4, tolJ=1e-3, 
     iterLS=0; iter=0
 
     Jold = Jstop
-    xOld=xc
+    xOld = xc
     while 1:
         # evaluate objective function
         Jc,dJ,H = fctn(xc)
@@ -79,17 +81,17 @@ def GaussNewton(fctn, x0,maxIter=20, maxIterLS=10, LSreduction=1e-4, tolJ=1e-3, 
 
     return xc
 
+
 def Rosenbrock(x):
-    """
-        Rosenbrock function for testing GaussNewton scheme
-    """
-    J   = 100*(x[1]-x[0]**2)**2+(1-x[0])**2
-    dJ  = np.array([2*(200*x[0]**3-200*x[0]*x[1]+x[0]-1),200*(x[1]-x[0]**2)])
-    H = np.array([[-400*x[1]+1200*x[0]**2+2, -400*x[0]],[ -400*x[0], 200]],dtype=float);
+    """Rosenbrock function for testing GaussNewton scheme"""
 
-    return J,dJ,H
+    f = np.array([100*(x[1]-x[0]**2)**2+(1-x[0])**2])
+    g = np.array([2*(200*x[0]**3-200*x[0]*x[1]+x[0]-1), 200*(x[1]-x[0]**2)])
+    H = np.array([[-400*x[1]+1200*x[0]**2+2, -400*x[0]], [-400*x[0], 200]])
+    return f, g, H
 
-def checkDerivative(fctn,x0):
+
+def checkDerivative(fctn, x0, num=7, plotIt=True, dx=None):
     """
         Basic derivative check
 
@@ -102,45 +104,60 @@ def checkDerivative(fctn,x0):
          x0    -  point at which to check derivative
     """
 
-    print "%s checkDerivative %s" % ('='*20,'='*20)
-    print "iter\th\t\t|J0-Jt|\t\t|J0+h*dJ'*dx-Jt|"
+    print "%s checkDerivative %s" % ('='*20, '='*20)
+    print "iter\th\t\t|J0-Jt|\t\t|J0+h*dJ'*dx-Jt|\tOrder\n%s" % ('-'*57)
 
-    try:
-        Jc,dJ,H = fctn(x0)
-    except Exception, e:
-        Jc,dJ = fctn(x0)
-    finally:
-        pass
+    Jc = fctn(x0)
 
+    x0 = mkvc(x0)
 
-    dx = np.random.randn(len(x0),1)
+    if dx is None:
+        dx = np.random.randn(len(x0))
 
-    t  = np.logspace(-1,-10,10)
-    E0 = np.zeros(t.shape)
-    E1 = np.zeros(t.shape)
+    t  = np.logspace(-1, -num, num)
+    E0 = np.ones(t.shape)
+    E1 = np.ones(t.shape)
 
-    for i in range(0,10):
+    for i in range(num):
         Jt = fctn(x0+t[i]*dx)
-        E0[i] = norm(Jt[0]-Jc[0])                           # 0th order Taylor
-        E1[i] = norm(Jt[0]-Jc[0]-t[i]*dJ.dot(dx))      # 1st order Taylor
+        E0[i] = norm(Jt[0]-Jc[0], 2)                     # 0th order Taylor
+        E1[i] = norm(Jt[0]-Jc[0]-t[i]*Jc[1].dot(dx), 2)  # 1st order Taylor
+        order = np.r_[np.nan,np.log10(E1[:-1]/E1[1:])]
+        print "%d\t%1.2e\t%1.3e\t\t%1.3e\t\t%1.3f" % (i, t[i], E0[i], E1[i], order[i])
 
-        print "%d\t%1.2e\t%1.3e\t%1.3e" % (i,t[i],E0[i],E1[i])
+    tolerance = 0.9
+    expectedOrder = 2
+    passTest = np.mean(order[1:]) > tolerance * expectedOrder
 
-    print "%s DONE! %s\n" % ('='*25,'='*25)
-    plt.figure()
-    plt.clf()
-    plt.loglog(t,E0,'b')
-    plt.loglog(t,E1,'g--')
-    plt.title('checkDerivative')
-    plt.xlabel('h')
-    plt.ylabel('error of Taylor approximation')
-    plt.legend(['0th order', '1st order'],loc='upper left')
-    plt.show()
+    if passTest:
+        print "%s PASS! %s\n" % ('='*25, '='*25)
+    else:
+        print "%s\n%s FAIL! %s\n%s" % ('*'*57, '<'*25, '>'*25, '*'*57)
+
+    if plotIt:
+        plt.figure()
+        plt.clf()
+        plt.loglog(t, E0, 'b')
+        plt.loglog(t, E1, 'g--')
+        plt.title('checkDerivative')
+        plt.xlabel('h')
+        plt.ylabel('error of Taylor approximation')
+        plt.legend(['0th order', '1st order'], loc='upper left')
+        plt.show()
     return
 
 if __name__ == '__main__':
-    x0 = np.array([[2.6],[3.7]])
+    x0 = np.array([2.6, 3.7])
     fctn = lambda x:Rosenbrock(x)
-    checkDerivative(fctn,x0)
-    xOpt = GaussNewton(fctn,x0,maxIter=20)
-    print "xOpt=[%f,%f]" % (xOpt[0],xOpt[1])
+    checkDerivative(fctn, x0, plotIt=False)
+    xOpt = GaussNewton(fctn, x0, maxIter=20)
+    print "xOpt=[%f, %f]" % (xOpt[0], xOpt[1])
+
+    def simplePass(x):
+        return np.sin(x), sdiag(np.cos(x))
+
+    def simpleFail(x):
+        return np.sin(x), -sdiag(np.cos(x))
+
+    checkDerivative(simplePass, np.random.randn(5), plotIt=False)
+    checkDerivative(simpleFail, np.random.randn(5), plotIt=False)
