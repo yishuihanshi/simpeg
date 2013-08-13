@@ -1,7 +1,6 @@
 import numpy as np
 from BaseMesh import BaseMesh
-from utils import ndgrid, mkvc
-from sputils import sdiag,speye,spzeros
+from utils import ndgrid, mkvc,sdiag,speye,spzeros
 from scipy import sparse as sp
 from TensorMesh import TensorMesh
 import matplotlib.pyplot as plt
