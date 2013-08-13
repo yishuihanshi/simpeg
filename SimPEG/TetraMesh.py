@@ -22,6 +22,8 @@ class TetraMesh(BaseMesh):
         mesh = TetraMesh([hx, hy, hz])
 
     """
+    _meshType = 'TetraMesh'
+
     def __init__(self, h, x0=None):
         super(TetraMesh, self).__init__(np.array([x.size for x in h]), x0)
 
@@ -388,7 +390,7 @@ class TetraMesh(BaseMesh):
                     cofA = np.c_[e2[:,0]*e3[:,1]-e2[:,1]*e3[:,0], -(e1[:,0]*e3[:,1]-e1[:,1]*e3[:,0]), e1[:,0]*e2[:,1]-e1[:,1]*e2[:,0] ]
 
 
-                    detA = e1[:,2]*cofA[:,0] + e2[:,2]*cofA[:,2]+ e3[:,2]*cofA[:,2]
+                    detA = e1[:,2]*cofA[:,0] + e2[:,2]*cofA[:,1]+ e3[:,2]*cofA[:,2]
 
 
                     # compute gradients of basis functions

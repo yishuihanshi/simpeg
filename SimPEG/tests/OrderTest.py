@@ -1,6 +1,6 @@
 import sys
 sys.path.append('../../')
-from SimPEG import TensorMesh, utils, LogicallyOrthogonalMesh
+from SimPEG import TensorMesh, utils, LogicallyOrthogonalMesh,TetraMesh
 import numpy as np
 import unittest
 
@@ -106,6 +106,23 @@ class OrderTest(unittest.TestCase):
                 X, Y, Z = utils.exampleLomGird([nc, nc, nc], kwrd)
                 self.M = LogicallyOrthogonalMesh([X, Y, Z])
             return 1./nc
+        elif 'TetraMesh' in self._meshType:
+            if 'uniform' in self._meshType:
+                h1 = np.ones(nc)/nc
+                h2 = np.ones(nc)/nc
+                h3 = np.ones(nc)/nc
+                h = [h1, h2, h3]
+            elif 'random' in self._meshType:
+                h1 = np.random.rand(nc)
+                h2 = np.random.rand(nc)
+                h3 = np.random.rand(nc)
+                h = [hi/np.sum(hi) for hi in [h1, h2, h3]]  # normalize
+            else:
+                raise Exception('Unexpected meshType')
+
+            self.M = TetraMesh(h[:self.meshDimension])
+            max_h = max([np.max(hi) for hi in self.M.h])
+            return max_h
 
     def getError(self):
         """For given h, generate A[h], f and A(f) and return norm of error."""

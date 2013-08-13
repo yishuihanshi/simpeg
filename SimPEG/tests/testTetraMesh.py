@@ -3,6 +3,7 @@ import sys
 sys.path.append('../')
 from TetraMesh import TetraMesh
 import numpy as np
+from OrderTest import OrderTest
 
 
 class TestTetraMeshSetup2D(unittest.TestCase):
@@ -146,6 +147,70 @@ class TestTetraMeshSetup3D(unittest.TestCase):
         Pt = (1/4.0)*(self.mesh.P1+self.mesh.P2+self.mesh.P3+self.mesh.P4)*self.mesh.nodes
         self.assertTrue(all( (PC ==  Pt).flatten()))
 
+class TestDiffOps(OrderTest):
+    name = "Test Differential Operators"
+    meshSizes = [8,16,32]
+    meshTypes = ['uniformTetraMesh']
+    _meshType = meshTypes[0]
+    expectedOrders = 1.
+
+    def getError(self):
+        # Create some functions to integrate
+        if self.meshDimension==2:
+            fun = lambda x: np.sin(2*np.pi*x[:, 0])*np.sin(2*np.pi*x[:, 1])
+            if self.testDim==1:
+                sol = lambda x: 2*np.pi*np.cos(2*np.pi*x[:, 0])*np.sin(2*np.pi*x[:, 1])
+                Di  = self.M.Dx
+            elif self.testDim==2:
+                sol = lambda x: 2*np.pi*np.sin(2*np.pi*x[:, 0])*np.cos(2*np.pi*x[:, 1])
+                Di  = self.M.Dy
+        elif self.meshDimension==3:
+            fun = lambda x: np.sin(2*np.pi*x[:, 0])*np.sin(2*np.pi*x[:, 1])*np.sin(2*np.pi*x[:, 2])
+            if self.testDim==1:
+                sol = lambda x: 2*np.pi*np.cos(2*np.pi*x[:, 0])*np.sin(2*np.pi*x[:, 1])*np.sin(2*np.pi*x[:, 2])
+                Di  = self.M.Dx
+            elif self.testDim==2:
+                sol = lambda x: 2*np.pi*np.sin(2*np.pi*x[:, 0])*np.cos(2*np.pi*x[:, 1])*np.sin(2*np.pi*x[:, 2])
+                Di  = self.M.Dy
+            elif self.testDim==3:
+                sol = lambda x: 2*np.pi*np.sin(2*np.pi*x[:, 0])*np.sin(2*np.pi*x[:, 1])*np.cos(2*np.pi*x[:, 2])
+                Di  = self.M.Dz
+
+        sA = sol(self.M.PC*self.M.nodes)
+        sN = Di*fun(self.M.nodes)
+        err = np.linalg.norm((sA - sN), np.inf)
+
+
+
+        return err
+
+    def test_Dx(self):
+        self.name = "Test Differential Operators - Dx in 3D"
+        self.meshDimension = 3
+        self.testDim = 1
+        self.orderTest()
+
+    def test_Dy(self):
+        self.name = "Test Differential Operators - Dy in 3D"
+        self.testDim = 2
+        self.orderTest()
+
+    def test_Dx2D(self):
+        self.name = "Test Differential Operators - Dx in 2D"
+        self.meshDimension = 2
+        self.testDim = 1
+        self.orderTest()
+
+    def test_Dy2D(self):
+        self.name = "Test Differential Operators - Dy in 2D"
+        self.meshDimension = 2
+        self.testDim = 2
+        self.orderTest()
+
+    def test_Dz(self):
+        self.name = "Test Differential Operators - Dz in 3D"
+        self.testDim = 3
+        self.orderTest()
 
 
 if __name__ == '__main__':
