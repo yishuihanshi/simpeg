@@ -144,7 +144,7 @@ def checkDerivative(fctn, x0, num=7, plotIt=True, dx=None):
         plt.ylabel('error of Taylor approximation')
         plt.legend(['0th order', '1st order'], loc='upper left')
         plt.show()
-    return
+    return passTest
 
 if __name__ == '__main__':
     x0 = np.array([2.6, 3.7])

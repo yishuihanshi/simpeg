@@ -150,9 +150,8 @@ class TestTetraMeshSetup3D(unittest.TestCase):
 class TestDiffOps(OrderTest):
     name = "Test Differential Operators"
     meshSizes = [8,16,32]
-    meshTypes = ['uniformTetraMesh']
-    _meshType = meshTypes[0]
-    expectedOrders = 1.
+    meshTypes = ['uniformTetraMesh','randomTetraMesh']
+    expectedOrders = 2.
 
     def getError(self):
         # Create some functions to integrate
@@ -178,10 +177,7 @@ class TestDiffOps(OrderTest):
 
         sA = sol(self.M.PC*self.M.nodes)
         sN = Di*fun(self.M.nodes)
-        err = np.linalg.norm((sA - sN), np.inf)
-
-
-
+        err = np.linalg.norm(self.M.vol*(sA - sN), 2)
         return err
 
     def test_Dx(self):
