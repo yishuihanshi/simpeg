@@ -122,12 +122,19 @@ def checkDerivative(fctn, x0, num=7, plotIt=True, dx=None):
         Jt = fctn(x0+t[i]*dx)
         E0[i] = norm(Jt[0]-Jc[0], 2)                     # 0th order Taylor
         E1[i] = norm(Jt[0]-Jc[0]-t[i]*Jc[1].dot(dx), 2)  # 1st order Taylor
-        order = np.r_[np.nan,np.log10(E1[:-1]/E1[1:])]
-        print "%d\t%1.2e\t%1.3e\t\t%1.3e\t\t%1.3f" % (i, t[i], E0[i], E1[i], order[i])
+        order0 = np.log10(E0[:-1]/E0[1:])
+        order1 = np.log10(E1[:-1]/E1[1:])
+        print "%d\t%1.2e\t%1.3e\t\t%1.3e\t\t%1.3f" % (i, t[i], E0[i], E1[i], np.nan if i == 0 else order1[i-1])
 
     tolerance = 0.9
     expectedOrder = 2
-    passTest = np.mean(order[1:]) > tolerance * expectedOrder
+    eps = 1e-10
+    order0 = order0[E0[1:] > eps]
+    order1 = order1[E1[1:] > eps]
+    belowTol = order1.size == 0 and order0.size > 0
+    correctOrder = order1.size > 0 and np.mean(order1) > tolerance * expectedOrder
+
+    passTest = belowTol or correctOrder
 
     if passTest:
         print "%s PASS! %s\n" % ('='*25, '='*25)
@@ -144,6 +151,7 @@ def checkDerivative(fctn, x0, num=7, plotIt=True, dx=None):
         plt.ylabel('error of Taylor approximation')
         plt.legend(['0th order', '1st order'], loc='upper left')
         plt.show()
+
     return passTest
 
 if __name__ == '__main__':
