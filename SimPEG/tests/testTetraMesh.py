@@ -4,7 +4,8 @@ sys.path.append('../')
 from TetraMesh import TetraMesh
 import numpy as np
 from OrderTest import OrderTest
-
+from GaussNewton import checkDerivative
+from scipy import sparse as sp
 
 class TestTetraMeshSetup2D(unittest.TestCase):
 
@@ -208,6 +209,63 @@ class TestDiffOps(OrderTest):
         self.testDim = 3
         self.orderTest()
 
+class TestDerivatives2D(unittest.TestCase):
+    def setUp(self):
+        n = np.round(np.random.rand(2)*6)+1
+        h1 = np.random.rand(n[0])
+        h2 = np.random.rand(n[1])
+        x0 = np.random.rand(2)
+
+        self.mesh = TetraMesh([h1,h2],x0)
+
+    def test_volume(self):
+        self.name = "TestDerivatives2D - volume"
+        d = lambda y: self.mesh.getVolume(y)
+        x0 = self.mesh.nodes.flatten(order='F')
+
+        self.assertTrue(checkDerivative(d,x0,plotIt=False))
+
+    def test_determinant(self):
+        self.name = "TestDerivatives2D - determinant"
+        d = lambda y: self.mesh.getDeterminant(y)
+        x0 = self.mesh.nodes.flatten(order='F')
+
+        self.assertTrue(checkDerivative(d,x0,plotIt=False))
+
+class TestDerivatives3D(unittest.TestCase):
+    def setUp(self):
+        n = np.round(np.random.rand(3)*6)+1
+        h1 = np.random.rand(n[0])
+        h2 = np.random.rand(n[1])
+        h3 = np.random.rand(n[2])
+        x0 = np.random.rand(3)
+
+        self.mesh = TetraMesh([h1,h2,h3],x0)
+
+    def test_volume(self):
+        self.name = "TestDerivatives3D - volume"
+        d = lambda y: self.mesh.getVolume(y)
+        x0 = self.mesh.nodes.flatten(order='F')
+
+        self.assertTrue(checkDerivative(d,x0,plotIt=False))
+
+    def test_determinant(self):
+        self.name = "TestDerivatives3D - determinant"
+        d = lambda y: self.mesh.getDeterminant(y)
+        x0 = self.mesh.nodes.flatten(order='F')
+
+        self.assertTrue(checkDerivative(d,x0,plotIt=False))
+
+    def test_Cofactor(self):
+        self.name = "TestDerivatives3D - cofactor"
+        def fctn(y):
+            cof,dCof = self.mesh.getCofactor(y)
+            cof = np.r_[cof[:,0],cof[:,1],cof[:,2],cof[:,3],cof[:,4],cof[:,5],cof[:,6],cof[:,7],cof[:,8]]
+            dCof = sp.vstack((dCof[0],dCof[1],dCof[2],dCof[3],dCof[4],dCof[5],dCof[6],dCof[7],dCof[8]))
+            return cof,dCof
+
+        x0 = self.mesh.nodes.flatten(order='F',plotIt=False)
+        checkDerivative(fctn,x0)
 
 if __name__ == '__main__':
     unittest.main()

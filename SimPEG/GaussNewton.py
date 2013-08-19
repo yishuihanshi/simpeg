@@ -123,7 +123,7 @@ def checkDerivative(fctn, x0, num=7, plotIt=True, dx=None):
         E0[i] = norm(Jt[0]-Jc[0], 2)                     # 0th order Taylor
         E1[i] = norm(Jt[0]-Jc[0]-t[i]*Jc[1].dot(dx), 2)  # 1st order Taylor
         order = np.r_[np.nan,np.log10(E1[:-1]/E1[1:])]
-        print "%d\t%1.2e\t%1.3e\t\t%1.3e\t\t%1.3f" % (i, t[i], E0[i], E1[i], order[i])
+        print "%d\t%1.2e\t\t%1.3e\t\t%1.3e\t\t%1.3f" % (i, t[i], E0[i], E1[i], order[i])
 
     tolerance = 0.9
     expectedOrder = 2

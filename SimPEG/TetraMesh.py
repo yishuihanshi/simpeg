@@ -447,7 +447,7 @@ class TetraMesh(BaseMesh):
             V  = (e1[:,0]*e2[:,1] - e1[:,1]*e2[:,0])/2.0
 
             if doDerivative:
-                dV =   sp.hstack(( sdiag(e2[:,1])*PE1 - sdiag(e1[:,1])*PE2 , sdiag(e1[:,1])*PE2 - sdiag(e2[:,0])*PE1))/2.0
+                dV =   sp.hstack(( sdiag(e2[:,1])*PE1 - sdiag(e1[:,1])*PE2 , sdiag(e1[:,0])*PE2 - sdiag(e2[:,0])*PE1))/2.0
                 return V,dV
             else:
                 return V
@@ -474,7 +474,7 @@ class TetraMesh(BaseMesh):
                 dcof31 =   sp.hstack((sdiag(e3[:,1])*PE2 - sdiag(e2[:,1])*PE3, sdiag(e2[:,0])*PE3 - sdiag(e3[:,0])*PE2,Z))
 
                 # apply product rule
-                dV  = (1/6.0)*(sp.hstack((sdiag(cof11)*PE1, sdiag(cof21)*self.PE1, sdiag(cof31)*self.PE1) + sdiag(e1[:,0]) * dcof11 + sdiag(e1[:,1]) * dcof21 + sdiag(e1[:,2]) * dcof31))
+                dV  = (1/6.0)*(sp.hstack((sdiag(cof11)*PE1, sdiag(cof21)*self.PE1, sdiag(cof31)*self.PE1)) + sdiag(e1[:,0]) * dcof11 + sdiag(e1[:,1]) * dcof21 + sdiag(e1[:,2]) * dcof31)
 
                 return V,dV
             else:
@@ -517,11 +517,11 @@ class TetraMesh(BaseMesh):
             dcof21 = - sp.hstack((sdiag(e3[:,2])*Dy - sdiag(e2[:,2])*Dz,  Z, sdiag(e2[:,0])*Dz - sdiag(e3[:,0])*Dy))
             dcof31 =   sp.hstack((sdiag(e3[:,1])*Dy - sdiag(e2[:,1])*Dz, sdiag(e2[:,0])*Dz - sdiag(e3[:,0])*Dy,Z))
 
-            dcof12 = - sp.hstack((Z,  sdiag(e3[:,2])*Dx - sdiag(e1[:,2])*Dz, sdiag(e1[:,1])*Dz - sdiag(e1[:,1])*Dx))
+            dcof12 = - sp.hstack((Z,  sdiag(e3[:,2])*Dx - sdiag(e1[:,2])*Dz, sdiag(e1[:,1])*Dz - sdiag(e3[:,1])*Dx))
             dcof22 =   sp.hstack((sdiag(e3[:,2])*Dx - sdiag(e1[:,2])*Dz,  Z, sdiag(e1[:,0])*Dz - sdiag(e3[:,0])*Dx))
             dcof32 = - sp.hstack((sdiag(e3[:,1])*Dx - sdiag(e1[:,1])*Dz, sdiag(e1[:,0])*Dz - sdiag(e3[:,0])*Dx,Z))
 
-            dcof13 =   sp.hstack((Z,  sdiag(e2[:,2])*Dx - sdiag(e1[:,2])*Dy, sdiag(e2[:,1])*Dx - sdiag(e2[:,1])*Dx))
+            dcof13 =   sp.hstack((Z,  sdiag(e2[:,2])*Dx - sdiag(e1[:,2])*Dy, sdiag(e1[:,1])*Dy - sdiag(e2[:,1])*Dx))
             dcof23 = - sp.hstack((sdiag(e2[:,2])*Dx - sdiag(e1[:,2])*Dy,  Z, sdiag(e1[:,0])*Dy - sdiag(e2[:,0])*Dx))
             dcof33 =   sp.hstack((sdiag(e2[:,1])*Dx - sdiag(e1[:,1])*Dy, sdiag(e1[:,0])*Dy - sdiag(e2[:,0])*Dx,Z))
           # apply product rule
@@ -551,7 +551,7 @@ class TetraMesh(BaseMesh):
             V  = (e1[:,0]*e2[:,1] - e1[:,1]*e2[:,0])
 
             if doDerivative:
-                dV =   sp.hstack(( sdiag(e2[:,1])*Dx - sdiag(e1[:,1])*Dy , sdiag(e1[:,1])*Dy - sdiag(e2[:,0])*Dx))
+                dV =   sp.hstack(( sdiag(e2[:,1])*Dx - sdiag(e1[:,1])*Dy , sdiag(e1[:,0])*Dy - sdiag(e2[:,0])*Dx))
                 return V,dV
             else:
                 return V
