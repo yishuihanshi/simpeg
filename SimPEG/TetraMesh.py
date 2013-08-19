@@ -1,10 +1,11 @@
 import numpy as np
 from BaseMesh import BaseMesh
-from utils import ndgrid, mkvc,sdiag,speye,spzeros
+from utils import  mkvc,sdiag,speye,spzeros
 from scipy import sparse as sp
 from TensorMesh import TensorMesh
 import matplotlib.pyplot as plt
 import matplotlib
+
 class TetraMesh(BaseMesh):
     """
     TetraMesh is a mesh class that deals with structured triangular/tetrahedral elements
@@ -417,6 +418,19 @@ class TetraMesh(BaseMesh):
         return locals()
     _GRAD = None  # Store grid by default
     GRAD = property(**GRAD())
+
+    def DIV():
+        doc = "Divergence"
+        def fget(self):
+            if self._DIV is None:
+                if self.dim==2:
+                    self._DIV = sp.hstack((self.Dx,self.Dy))
+                elif self.dim==3:
+                    self._DIV = sp.hstack((self.Dx,self.Dy,self.Dz))
+            return self._DIV
+        return locals()
+    _DIV = None  # Store grid by default
+    DIV = property(**DIV())
 
     # --------------- Geometries ---------------------
     def vol():
