@@ -1,6 +1,6 @@
 import numpy as np
-from utils import mkvc
-from sputils import sdiag
+from utils import mkvc, sdiag
+from scipy import sparse as sp
 import scipy.sparse.linalg.dsolve as dsl
 from InnerProducts import getFaceInnerProduct, getEdgeInnerProduct
 
@@ -64,7 +64,7 @@ if __name__ == '__main__':
     from scipy import sparse as sp
 
     # generate the mesh
-    h = [25*np.ones(16), 25*np.ones(16), 25*np.ones(16)]
+    h = [25*np.ones(8), 25*np.ones(8), 25*np.ones(8)]
     mesh = TensorMesh(h, [-200.0, -200.0, -200.0])
 
     # generate the interpolation matrix
@@ -110,12 +110,13 @@ if __name__ == '__main__':
     # setup the model
     m = np.log(1e-3*np.ones(nact))
     # solve maxwell and get derivatives
-    mis, dmis, d = getMisfit(m, mesh, forward, param)
+    mis, dmis, d ,r = getMisfit(m, mesh, forward, param)
 
     # check derivatives
     dm = 1e-1*np.random.randn(nact)
-    mis1, dmis1, d1 = getMisfit(m+dm, mesh, forward, param)
+    mis1, dmis1, d1,r1 = getMisfit(m+dm, mesh, forward, param)
 
     print mis1-mis,  mis1-mis - dm.dot(dmis)
+
 
 
