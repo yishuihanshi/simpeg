@@ -19,9 +19,9 @@ def GaussNewton(misfun, regfun, regpar, x0,maxIter=20, maxIterLS=10, LSreduction
             xOpt - numerical optimizer
     """
     # initial output
-    print "%s GaussNewton %s" % ('='*22,'='*22)
-    print "iter\tJc\t\t\tMc\t\t\tRc\t\tnorm(dJ)\tLS"
-    print "%s" % '-'*57
+    print "%s GaussNewton %s" % ('='*30,'='*30)
+    print "iter\tJc\t\t\tMc\t\t\t\tRc\t\t\t\tnorm(dJ)\tLS"
+    print "%s" % '-'*73
 
     # evaluate stopping criteria
     if xStop==[]:
@@ -39,7 +39,7 @@ def GaussNewton(misfun, regfun, regpar, x0,maxIter=20, maxIterLS=10, LSreduction
         Jc  = Mc + regpar*Rc
         dJc = dMc + regpar*dRc
 
-        print "%3d\t%1.2e\t%1.2e\t%1.2e\t%1.2e\t%d" % (iter, Jc,Mc,Rc,norm(dJc),iterLS)
+        print "%3d\t%1.2e\t\t%1.2e\t\t%1.2e\t\t%1.2e\t%d" % (iter, Jc,Mc,regpar*Rc,norm(dJc),iterLS)
 
         # get search direction
         dx = incg(JMc,HRc,regpar,-dJc,maxIter=10,tol=1e-4,verbose=True)
@@ -78,10 +78,10 @@ def GaussNewton(misfun, regfun, regpar, x0,maxIter=20, maxIterLS=10, LSreduction
         Jold = Jc; xOld = xc
     # ENDWHILE FOR GAUSS NEWTON
 
-    print "%s STOP! %s" % ('-'*25,'-'*25)
+    print "%s STOP! %s" % ('-'*33,'-'*33)
     print "%d : |xc-xOld| = %1.4e\t<=\ttolX    \t= %1.4e"  % (STOP[0],norm(xc-xOld),tolX)
     print "%d : iter      = %3d\t\t\t<=\tmaxIter\t\t= %3d" % (STOP[1],iter,maxIter)
-    print "%s DONE! %s\n" % ('='*25,'='*25)
+    print "%s DONE! %s\n" % ('='*33,'='*33)
 
     return xc
 
@@ -95,7 +95,6 @@ def incg(JMc,HRc,regpar,rhs,maxIter=10,tol=1e-2,verbose=False):
     # Prepare for CG iteration.
     x = np.zeros(rhs.shape)
     r = rhs
-    n = len(b)
     rho = np.vdot(r,r)
 
     iter = 1
