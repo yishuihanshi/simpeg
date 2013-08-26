@@ -16,7 +16,7 @@ def getMisfit(m, mesh, forward, param):
 
     mis   = 0
     dmis  = m*0
-
+    d = dobs*0; r = dobs*0
     # Maxwell's system for E
     for i in range(len(omega)):
         for j in range(rhs.shape[1]):
@@ -31,18 +31,18 @@ def getMisfit(m, mesh, forward, param):
             e = mkvc(e)
             print np.linalg.norm(A*e-b)/np.linalg.norm(b)
             P = forward['projection']
-            d = P.dot(e)
+            d[j, :, i] = P.dot(e)
 
             # change to r[j,:,i] = mkvc(d) - mkvc(dobs[j,:,i])
             # and after computing
             # rw = hadamard(W[j,:,i],r)
             # not to forget to multiply again with W for the gradient
-            r = mkvc(d) - mkvc(dobs[j, :, i])
+            r[j, :, i] = mkvc(d[j, :, i]) - mkvc(dobs[j, :, i])
 
-            mis  = mis + 0.5*np.real(r.conj().T.dot(r))
+            mis  = mis + 0.5*np.real(r[j, :, i].conj().T.dot(r[j, :, i]))
 
             # get derivatives
-            lam = dsl.spsolve(A.T, P.T.dot(r))
+            lam = dsl.spsolve(A.T, P.T.dot(r[j, :, i]))
             lam = mkvc(lam)
             Gij = 0
             I3  = sp.vstack((sp.identity(mesh.nC), sp.identity(mesh.nC), sp.identity(mesh.nC)))
@@ -54,7 +54,7 @@ def getMisfit(m, mesh, forward, param):
             #   G = vstack((G,Gij))
             dmis = dmis + np.real(sdiag(np.exp(m)).dot(Act.dot(Gij.conj().T.dot(lam))))
 
-    return mis, dmis, d
+    return mis, dmis, d, r
 
 
 if __name__ == '__main__':
