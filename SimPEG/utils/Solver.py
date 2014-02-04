@@ -5,7 +5,7 @@ from SimPEG.utils import mkvc, sdiag
 import warnings
 
 DEFAULTS = {'direct':'scipy', 'iter':'scipy', 'triangular':'fortran', 'diagonal':'python'}
-OPTIONS = {'direct':['scipy'], 'iter':['scipy'], 'triangular':['python'], 'diagonal':['python']}
+OPTIONS = {'direct':['scipy','petsc'], 'iter':['scipy'], 'triangular':['python'], 'diagonal':['python']}
 
 try:
     import TriSolve
@@ -136,8 +136,11 @@ class Solver(object):
             X = self.solveDirect_scipy(b, factorize)
         elif backend == 'mumps':
             X = self.solveDirect_mumps(b, factorize)
+        elif backend == 'petsc':
+            X = self.solveDirect_petsc(b,factorize)
 
         return X
+
 
     def solveDirect_scipy(self, b, factorize):
         """
@@ -210,6 +213,40 @@ class Solver(object):
                     X[:,i] = mumps.spsolve(self.A,b[:,i])
 
         return X
+
+    def solveDirect_petsc(self,b, factorize):
+
+        # try:
+        import petsc4py # Import DNSPython
+        import PETScIO as IO
+        # except ImportError:
+            # print "PETSc needs to be configured for python"
+            # quit()
+
+        import sys
+        petsc4py.init(sys.argv)
+        from petsc4py import PETSc
+
+        print self.A.shape
+        Apetsc = PETSc.Mat().createAIJ(self.A.shape,csr=(self.A.indptr,self.A.indices, self.A.data))
+        bpetsc = IO.arrayToVec(b)
+
+        if len(b.shape) == 1 or b.shape[1] == 1:
+
+                X = IO.arrayToVec(b*0)
+                ksp = PETSc.KSP().create()
+                pc = ksp.getPC()
+                ksp.setOperators(Apetsc)
+
+                # ksp.setType(options["ksp_type"].lower())
+                # pc.setType(options["pc_type"].lower())
+                ksp.setType('cg')
+                pc.setType('ilu')
+                ksp.view()
+                ksp.solve(bpetsc, X)
+
+                del Apetsc, bpetsc, ksp, pc
+                return IO.vecToArray(X)
 
     def solveIter(self, b, backend=None, M=None, iterSolver='CG', tol=1e-6, maxIter=50):
         if backend is None: backend = DEFAULTS['iter']
