@@ -4,22 +4,31 @@ import scipy.sparse.linalg as linalg
 from Utils.matutils import mkvc
 from Utils.sputils import sdiag
 import warnings
+import sys
 
 DEFAULTS = {'direct':'scipy', 'iter':'scipy', 'triangular':'fortran', 'diagonal':'python'}
-OPTIONS = {'direct':['scipy','petsc'], 'iter':['scipy'], 'triangular':['python'], 'diagonal':['python']}
+OPTIONS = {'direct':['scipy'], 'iter':['scipy'], 'triangular':['python'], 'diagonal':['python']}
 
 try:
     import Utils.TriSolve as TriSolve
     OPTIONS['triangular'].append('fortran')
-except Exception, e:
+except ImportError, e:
     print 'Warning: Python backend is being used for solver. Run setup.py from the command line.'
     DEFAULTS['triangular'] = 'python'
 
 try:
     import mumps
     OPTIONS['direct'].append('mumps')
-except Exception, e:
+except ImportError, e:
     print 'Warning: mumps solver not available.'
+
+try:
+    import petsc4py
+    from Utils import PETScIO
+    OPTIONS['direct'].append('petsc')
+    DEFAULTS['direct'] = 'petsc'
+except ImportError, e:
+    print "Warning: PETSc needs to be configured for python"
 
 class Solver(object):
     """
@@ -131,6 +140,7 @@ class Solver(object):
         """
         if backend is None: backend = DEFAULTS['direct']
 
+        assert backend in OPTIONS['direct'], "You must choose one of the available backends: (%s)" % ', '.join(OPTIONS['direct'])
         assert np.shape(self.A)[1] == np.shape(b)[0], 'Dimension mismatch'
 
         if backend == 'scipy':
@@ -217,24 +227,15 @@ class Solver(object):
 
     def solveDirect_petsc(self,b, factorize):
 
-        # try:
-        import petsc4py # Import DNSPython
-        import PETScIO as IO
-        # except ImportError:
-            # print "PETSc needs to be configured for python"
-            # quit()
-
-        import sys
         petsc4py.init(sys.argv)
         from petsc4py import PETSc
 
-        print self.A.shape
         Apetsc = PETSc.Mat().createAIJ(self.A.shape,csr=(self.A.indptr,self.A.indices, self.A.data))
-        bpetsc = IO.arrayToVec(b)
+        bpetsc = PETScIO.arrayToVec(b)
 
         if len(b.shape) == 1 or b.shape[1] == 1:
 
-                X = IO.arrayToVec(b*0)
+                X = PETScIO.arrayToVec(b*0)
                 ksp = PETSc.KSP().create()
                 pc = ksp.getPC()
                 ksp.setOperators(Apetsc)
@@ -247,7 +248,7 @@ class Solver(object):
                 ksp.solve(bpetsc, X)
 
                 del Apetsc, bpetsc, ksp, pc
-                return IO.vecToArray(X)
+                return PETScIO.vecToArray(X)
 
     def solveIter(self, b, backend=None, M=None, iterSolver='CG', tol=1e-6, maxIter=50):
         if backend is None: backend = DEFAULTS['iter']
