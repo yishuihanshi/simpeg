@@ -69,30 +69,6 @@ class Solver(object):
         # Now deal with iterative stuff only
         if 'M' not in options:
             warnings.warn("You should provide a preconditioner, M.", UserWarning)
-            return
-        M = options['M']
-        if type(M) is sp.linalg.LinearOperator:
-            return
-        PreconditionerList = ['J','GS']
-        if type(M) is str:
-            assert M in PreconditionerList, "M must be in the known preconditioner list. ['J','GS']"
-            M = (M,A) # use A as the base for the preconditioner.
-        if type(M) is tuple:
-            assert type(M[0]) is str and M[0] in PreconditionerList, "M as a tuple must be (str, Matrix) where str is in ['J','GS']: e.g. ('J', WtW) where J stands for Jacobi, and WtW is a sparse matrix."
-            if M[0] is 'J':
-                Jacobi = sdiag(1.0/M[1].diagonal())
-                options['M'] = Jacobi
-            elif M[0] is 'GS':
-                DD = sdiag(M[1].diagonal())
-                Uinv = Solver(M[1], flag='U')
-                Linv = Solver(M[1], flag='L')
-                def GS(f):
-                    return Uinv.solve(DD*Linv.solve(f))
-                options['M'] = sp.linalg.LinearOperator( A.shape, GS, dtype=A.dtype )
-
-        else:
-            raise Exception('M must be a LinearOperator or a tuple')
-
 
     def solve(self, b):
         """
@@ -106,6 +82,8 @@ class Solver(object):
             :rtype: numpy.ndarray
             :return: x
         """
+        assert np.shape(self.A)[1] == np.shape(b)[0], 'Dimension mismatch'
+
         if self.flag is None and self.doDirect:
             return self.solveDirect(b, **self.options)
         elif self.flag is None and not self.doDirect:
@@ -141,7 +119,6 @@ class Solver(object):
         if backend is None: backend = DEFAULTS['direct']
 
         assert backend in OPTIONS['direct'], "You must choose one of the available backends: (%s)" % ', '.join(OPTIONS['direct'])
-        assert np.shape(self.A)[1] == np.shape(b)[0], 'Dimension mismatch'
 
         if backend == 'scipy':
             X = self.solveDirect_scipy(b, factorize)
@@ -251,7 +228,51 @@ class Solver(object):
                 return PETScIO.vecToArray(X)
 
     def solveIter(self, b, backend=None, M=None, iterSolver='CG', tol=1e-6, maxIter=50):
+        """
+            Use solve instead of this interface.
+
+            :param numpy.ndarray b: the right hand side
+            :param bool factorize: if you want to factorize and store factors
+            :param str backend: which backend to use. Default is scipy
+            :rtype: numpy.ndarray
+            :return: x
+        """
         if backend is None: backend = DEFAULTS['iter']
+
+        assert backend in OPTIONS['iter'], "You must choose one of the available backends: (%s)" % ', '.join(OPTIONS['iter'])
+
+        if backend == 'scipy':
+            X = self.solveIter_scipy(b, **self.options)
+        elif backend == 'petsc':
+            X = self.solveIter_petsc(b, **self.options)
+
+        return X
+
+    def solveIter_scipy(self, b, backend=None, M=None, iterSolver='CG', tol=1e-6, maxIter=50):
+
+
+        if type(M) is sp.linalg.LinearOperator:
+            return
+        PreconditionerList = ['J','SOR']
+        if type(M) is str:
+            assert M in PreconditionerList, "M must be in the known preconditioner list. ['J','SOR']"
+            M = (M,A) # use A as the base for the preconditioner.
+        if type(M) is tuple:
+            assert type(M[0]) is str and M[0] in PreconditionerList, "M as a tuple must be (str, Matrix) where str is in ['J','SOR']: e.g. ('J', WtW) where J stands for Jacobi, and WtW is a sparse matrix."
+            if M[0] is 'J':
+                Jacobi = sdiag(1.0/M[1].diagonal())
+                M = Jacobi
+            elif M[0] is 'SOR':
+                DD = sdiag(M[1].diagonal())
+                Uinv = Solver(M[1], flag='U')
+                Linv = Solver(M[1], flag='L')
+                def SOR(f):
+                    return Uinv.solve(DD*Linv.solve(f))
+                M = sp.linalg.LinearOperator( A.shape, SOR, dtype=A.dtype )
+
+        else:
+            raise Exception('M must be a LinearOperator or a tuple')
+
 
         algorithms = {'CG':sp.linalg.cg}
         assert iterSolver in algorithms, "iterSolver must be 'CG', or implement it yourself and add it here!"
@@ -414,7 +435,7 @@ if __name__ == '__main__':
     e = np.ones(M.nC)
     b = A.dot(e)
 
-    iSolve = Solver(A, doDirect=False,options={'M':('GS',A)})
+    iSolve = Solver(A, doDirect=False,options={'M':('SOR',A)})
     tic = time()
     x = iSolve.solve(b)
     toc = time() - tic
