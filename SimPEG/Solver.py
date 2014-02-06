@@ -219,8 +219,8 @@ class Solver(object):
 
                 # ksp.setType(options["ksp_type"].lower())
                 # pc.setType(options["pc_type"].lower())
-                ksp.setType('cg')
-                pc.setType('ilu')
+                ksp.setType('preonly')
+                pc.setType('lu')
                 ksp.view()
                 ksp.solve(bpetsc, X)
 
