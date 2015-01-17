@@ -235,7 +235,7 @@ class LogMap(IdentityMap):
 
         ..math::
 
-            m = \\exp(p)
+            m = \\log(p)
 
         NOTE: If you have a model which is log conductivity (ie. \\(m = \\log(\\sigma)\\)),
         you should be using an ExpMap 
@@ -640,3 +640,90 @@ class CircleMap(IdentityMap):
         g4 = a*(-Y + y)*(-sig1 + sig2)/(np.pi*(a**2*(-r + np.sqrt((X - x)**2 + (Y - y)**2))**2 + 1)*np.sqrt((X - x)**2 + (Y - y)**2))
         g5 = -a*(-sig1 + sig2)/(np.pi*(a**2*(-r + np.sqrt((X - x)**2 + (Y - y)**2))**2 + 1))
         return np.c_[g1,g2,g3,g4,g5]
+
+class SCemtMap(IdentityMap):
+    """
+        Self Consistent Effective Medium Theory Mapping 
+        (also sometimes referred to as Bruggeman mixing) for a two
+        phase material consisting of spherical particles. 
+
+    """
+    sig0 = None
+    sig1 = None
+
+    def __init__(self, mesh, **kwargs):
+        Maps.IdentityMap.__init__(self, mesh)
+        Utils.setKwargs(self, **kwargs)
+
+
+    _R = lambda sj,se:  3.0*se/(2.0*se+sj)
+
+    def _sc2phaseEMTtransform(sig0, sig1, phi1, tol=None, maxit=100, sigstart=None):
+        if tol is None:
+            tol = 1e-2*min(sig0,sig1)
+
+        if sigstart is None:
+            sigstart = _getCondBounds(sig0,sig1,phi1)
+            sigstart = sigstart[0]
+
+        if not (np.all(0 <= phi1) and np.all(phi1 <= 1)):
+            print 'there are phis outside bounds of 0 and 1'
+            phi1 = np.median(np.c_[phi1*0,phi1,phi1*0+1.])
+
+        phi0 = 1.0-phi1
+
+        sige1 = sigstart
+
+        for i in range(0,maxit):
+            R0 = _R(sig0,sige1)
+            R1 = _R(sig1,sige1)
+            den = phi0*R0 + phi1*R1
+            num = phi0*sig0*R0 + phi1*sig1*R1
+
+            sige2 = num/den
+            relerr = np.abs(sige2-sige1)
+
+            if np.all(relerr <= tol):
+                if np.all(sige2 <= tol):
+                    warning('Effective conductivity less than tolerance');
+                return sige2
+
+            sige1 = sige2
+        # TODO: make this a proper warning, and output relevant info (sig0, sig1, phi, sigstart, and relerr)
+        print 'Maximum number of iterations reached'
+        return sige2
+
+    def _sc2phaseEMTinversetransform(sige, sig0, sig1):
+        R0 = _R(sig0, sige)
+        R1 = _R(sig1, sige)
+
+        num = -(sige-sig0)*R0
+        den = (sige-sig1)*R1 - (sige-sig0)*R0
+
+        return num/den
+
+    def _sc2phaseEMTtransformDeriv(sige, sig0, sig1, phi1):
+        phi0 = 1.0-phi1
+
+        R0 = _R(sig0,sige)
+        R1 = _R(sig1,sige)
+
+        dR = lambda sj,se: 3.0*sj/(2.0*se+sj)**2.0
+
+        dR0 = dR(sig0,sige)
+        dR1 = dR(sig1,sige)
+
+        num = (sige-sig0)*R0 - (sige-sig1)*R1
+        den = phi0*(R0 + (sige-sig0)*dR0) + phi1*(R1 + (sige-sig1)*dR1)
+
+        return Utils.sdiag(num/den)
+
+    def _transform(self, m):
+        return _sc2phaseEMTtransform(self.sig0, self.sig1, m)
+
+    def deriv(self, m):
+        sige = self._transform(m)
+        return _sc2phaseEMTtransformDeriv(sige, self.sig0, self.sig1, m)
+
+    def inverse(self,sige):
+        return _sc2phaseEMTinversetransform(sige, self.sig0, self.sig1)
